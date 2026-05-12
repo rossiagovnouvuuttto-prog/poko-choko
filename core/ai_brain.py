@@ -31,6 +31,9 @@ SYSTEM_PROMPT = f"""Ты — {ASSISTANT_NAME}, голосовой ассисте
 - activate_window(title)      — переключиться на окно
 - close_window(title)         — закрыть окно
 - speak(text)                 — просто ответить голосом, без действий
+- random_anime()              — случайное аниме через Jikan API
+- recommend_anime(genre)      — подобрать аниме по жанру (романтика, экшен, ужасы, фэнтези и т.п.)
+- anime_edit(title)           — открыть первый обычный YouTube-ролик с эдитом/AMV по аниме
 
 Отвечай СТРОГО одним JSON-объектом без пояснений и без markdown:
 {{"function": "имя", "args": {{"ключ": "значение"}}, "reply": "что произнести"}}
@@ -42,6 +45,11 @@ SYSTEM_PROMPT = f"""Ты — {ASSISTANT_NAME}, голосовой ассисте
 "открой что-нибудь для заметок" → {{"function":"open_app","args":{{"name":"notepad"}},"reply":"Открываю блокнот."}}
 "таймер сна на 45 минут" → {{"function":"sleep_timer","args":{{"minutes":45}},"reply":"Таймер на 45 минут установлен."}}
 "расскажи анекдот" → {{"function":"speak","args":{{"text":"Программист в магазине..."}},"reply":"Программист в магазине..."}}
+"случайное аниме" → {{"function":"random_anime","args":{{}},"reply":"Подбираю случайное аниме."}}
+"посоветуй аниме романтика" → {{"function":"recommend_anime","args":{{"genre":"романтика"}},"reply":"Подбираю романтическое аниме."}}
+"посоветуй аниме экшен" → {{"function":"recommend_anime","args":{{"genre":"экшен"}},"reply":"Подбираю аниме в жанре экшен."}}
+"эдит наруто" → {{"function":"anime_edit","args":{{"title":"Naruto"}},"reply":"Открываю эдит Naruto."}}
+"найди эдит" → {{"function":"anime_edit","args":{{"title":""}},"reply":"Открываю эдит случайного аниме."}}
 """
 
 

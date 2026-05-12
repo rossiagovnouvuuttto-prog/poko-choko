@@ -1,7 +1,80 @@
 """Управление окнами Windows и браузером по умолчанию"""
+import re
 import webbrowser
 from typing import List, Optional
+from urllib.parse import quote_plus
+
+import httpx
 import pygetwindow as gw
+
+
+# Регулярка для обычных видео в результатах поиска YouTube.
+# videoRenderer соответствует именно обычным роликам — Shorts
+# выдаются как reelShelfRenderer/shortsLockupViewModel и сюда не попадают.
+_YOUTUBE_VIDEO_ID_RE = re.compile(
+    r'"videoRenderer"\s*:\s*\{\s*"videoId"\s*:\s*"([A-Za-z0-9_-]{11})"'
+)
+
+_YOUTUBE_SEARCH_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+
+def find_first_youtube_video_id(query: str) -> Optional[str]:
+    """
+    Найти videoId первого обычного видео в выдаче YouTube по запросу.
+
+    Возвращает 11-символьный videoId или None, если не удалось.
+    Shorts не считаются (они идут другим рендерером).
+    """
+    if not query or not query.strip():
+        return None
+
+    url = f"https://www.youtube.com/results?search_query={quote_plus(query)}"
+    try:
+        response = httpx.get(
+            url,
+            headers=_YOUTUBE_SEARCH_HEADERS,
+            timeout=15.0,
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+    except Exception as e:
+        print(f"[YouTube] search error: {e}")
+        return None
+
+    match = _YOUTUBE_VIDEO_ID_RE.search(response.text)
+    if not match:
+        return None
+    return match.group(1)
+
+
+def open_first_youtube_video(query: str) -> bool:
+    """
+    Открыть первое обычное видео YouTube по запросу.
+
+    Если найден videoId — открывается https://www.youtube.com/watch?v=...
+    Если ничего не нашли — фолбэк на страницу поиска.
+    Возвращает True, если открылась страница видео; False — если фолбэк
+    или браузер не запустился.
+    """
+    if not query or not query.strip():
+        return False
+
+    video_id = find_first_youtube_video_id(query)
+    if video_id:
+        BrowserControl.open_url(f"https://www.youtube.com/watch?v={video_id}")
+        return True
+
+    # Видео не нашлось — отдаём страницу поиска, чтобы пользователь
+    # хоть что-то увидел.
+    BrowserControl.search_youtube(query)
+    return False
 
 
 class WindowManager:

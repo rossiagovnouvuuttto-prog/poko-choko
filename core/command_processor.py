@@ -15,8 +15,14 @@ from modules.system_control import (
     shutdown, cancel_shutdown, sleep_after,
     get_battery_percent, get_cpu_load,
 )
-from modules.window_manager import WindowManager, BrowserControl
+from modules.window_manager import (
+    WindowManager, BrowserControl, open_first_youtube_video,
+)
 from modules.script_runner import ScriptRunner
+from modules.anime import (
+    get_random_anime, get_anime_by_genre,
+    get_random_popular_anime_title, build_anime_reply,
+)
 from core.ai_brain import GemmaBrain
 
 
@@ -48,6 +54,8 @@ class CommandProcessor:
         self._last_command = ""
 
         # Жёсткие команды (более специфичные триггеры — выше)
+        # ВАЖНО: триггеры аниме-эдитов должны стоять ВЫШЕ "ютуб" и "видео",
+        # иначе команда "эдит наруто" уйдёт в обычный поиск по YouTube.
         self.commands = [
             (["отмени выключение"], self._cancel_shutdown),
             (["выключи компьютер"], self._shutdown),
@@ -55,6 +63,9 @@ class CommandProcessor:
             (["заблокируй", "блокировка"], self._lock),
             (["создай папку"], self._create_folder),
             (["найди в гугле", "поиск гугл"], self._google),
+            (["случайное аниме"], self._random_anime),
+            (["посоветуй аниме", "подбери аниме"], self._recommend_anime),
+            (["найди эдит", "эдит", "амв"], self._anime_edit),
             (["ютуб", "видео"], self._youtube),
             (["открой сайт"], self._open_url),
             (["открой пуск", "меню пуск"], self._open_start_menu),
@@ -83,6 +94,9 @@ class CommandProcessor:
             "activate_window":  lambda args: self._activate(args.get("title", "")),
             "close_window":     lambda args: self._close_window(args.get("title", "")),
             "speak":            lambda args: self.voice.speak(args.get("text", "")),
+            "random_anime":     lambda args: self._random_anime(""),
+            "recommend_anime":  lambda args: self._recommend_anime(args.get("genre", "")),
+            "anime_edit":       lambda args: self._anime_edit(args.get("title", "")),
         }
 
     # === Главная точка входа ===
@@ -234,6 +248,56 @@ class CommandProcessor:
             return
         BrowserControl.search_youtube(arg)
         self.voice.speak(f"Ищу на YouTube: {arg}")
+
+    # === Аниме ===
+
+    def _random_anime(self, _arg: str):
+        """Случайное аниме через Jikan API."""
+        self.voice.speak("Подбираю случайное аниме.")
+        anime = get_random_anime()
+        self.voice.speak(build_anime_reply(anime))
+
+    def _recommend_anime(self, arg: str):
+        """
+        Подбор аниме по жанру.
+        Если жанр не распознан — берём случайное аниме.
+        """
+        genre = (arg or "").strip()
+        if not genre:
+            self.voice.speak("Подбираю аниме.")
+            anime = get_random_anime()
+            self.voice.speak(build_anime_reply(anime))
+            return
+
+        anime = get_anime_by_genre(genre)
+        if anime:
+            self.voice.speak(f"Подбираю аниме в жанре {genre}.")
+            self.voice.speak(build_anime_reply(anime))
+        else:
+            # Не распознали жанр / API не ответил — даём случайное.
+            self.voice.speak("Жанр не распознан, ищу случайное аниме.")
+            anime = get_random_anime()
+            self.voice.speak(build_anime_reply(anime))
+
+    def _anime_edit(self, arg: str):
+        """
+        Открыть первый обычный YouTube-ролик с эдитом/AMV по названию.
+        Если название не указано — выбрать случайное аниме через Jikan.
+        """
+        title = (arg or "").strip()
+        if not title:
+            self.voice.speak("Выбираю случайное аниме для эдита.")
+            title = get_random_popular_anime_title()
+            if not title:
+                self.voice.speak("Не удалось получить название аниме.")
+                return
+
+        query = f"{title} anime edit amv"
+        opened = open_first_youtube_video(query)
+        if opened:
+            self.voice.speak(f"Открываю эдит {title}.")
+        else:
+            self.voice.speak(f"Видео не найдено, открыл поиск по {title}.")
 
     def _minimize(self, arg: str):
         if WindowManager.minimize(arg):
