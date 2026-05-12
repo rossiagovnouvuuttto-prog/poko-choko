@@ -71,8 +71,14 @@ class JarvisGUI(ctk.CTk):
         self.after(1000, self._tick_clock)
 
     def log(self, msg: str):
+        """Безопасно добавить строку в лог: обновление виджета — через self.after,
+        иначе вызов из фонового потока (start_assistant_loop) ломает tkinter."""
         ts = datetime.now().strftime("%H:%M:%S")
-        self.log_box.insert("end", f"[{ts}] {msg}\n")
+        line = f"[{ts}] {msg}\n"
+        self.after(0, lambda l=line: self._append_log(l))
+
+    def _append_log(self, line: str):
+        self.log_box.insert("end", line)
         self.log_box.see("end")
 
     def _start(self):

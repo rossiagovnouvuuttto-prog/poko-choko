@@ -136,12 +136,15 @@ class BrowserControl:
 
     @staticmethod
     def search_google(query: str) -> bool:
-        q = query.replace(" ", "+")
+        # quote_plus, а не .replace(" ", "+"): корректно экранирует #, &, ?, =
+        # и другие зарезервированные символы — иначе "C# программирование"
+        # обрежется на #.
+        q = quote_plus(query)
         return BrowserControl.open_url(f"https://www.google.com/search?q={q}")
 
     @staticmethod
     def search_youtube(query: str) -> bool:
-        q = query.replace(" ", "+")
+        q = quote_plus(query)
         return BrowserControl.open_url(
             f"https://www.youtube.com/results?search_query={q}"
         )

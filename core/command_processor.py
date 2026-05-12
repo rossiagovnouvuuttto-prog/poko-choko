@@ -52,6 +52,10 @@ class CommandProcessor:
         self.scripts = ScriptRunner()
         self.brain = GemmaBrain()
         self._last_command = ""
+        # Признак, что мы сейчас внутри LLM-исполнения. Используется жёсткими
+        # обработчиками, чтобы при неудаче не входить обратно в _llm_fallback()
+        # и не зацикливаться на одинаковых ответах Mistral.
+        self._in_llm_fallback = False
 
         # Жёсткие команды (более специфичные триггеры — выше)
         # ВАЖНО: триггеры аниме-эдитов должны стоять ВЫШЕ "ютуб" и "видео",
@@ -124,6 +128,11 @@ class CommandProcessor:
         """Спросить Mistral. Возвращает True, если она что-то решила."""
         if self.brain.mode == "off":
             return False
+        # Защита от рекурсии: если обработчик, вызванный из LLM, пытается снова
+        # уйти в фолбэк — просто отказываем, иначе получится бесконечный цикл
+        # одинаковых вызовов Mistral по одному и тому же _last_command.
+        if self._in_llm_fallback:
+            return False
         decision = self.brain.think(self._last_command)
         if decision:
             self._execute_llm_decision(decision)
@@ -131,7 +140,14 @@ class CommandProcessor:
         return False
 
     def _execute_llm_decision(self, decision: dict) -> None:
-        """Исполнить решение, которое вернула модель."""
+        """Исполнить решение, которое вернула модель.
+
+        Обработчики в self.llm_functions уже сами озвучивают результат
+        (например, _battery произнесёт "Уровень заряда: 80 процентов"),
+        поэтому reply произносим ДО вызова как пред-действием подтверждение,
+        иначе получится двойная озвучка в неправильном порядке.
+        Для speak() сам результат и есть реплика, так что ручная озвучка реплая не нужна.
+        """
         func_name = decision.get("function", "speak")
         args = decision.get("args", {}) or {}
         reply = decision.get("reply", "")
@@ -141,13 +157,21 @@ class CommandProcessor:
             self.voice.speak(reply or "Не знаю такой функции.")
             return
 
+        # Произносим предварительную реплику ДО выполнения, но только если
+        # функция не speak (у speak reply == сам результат).
+        if reply and func_name != "speak":
+            self.voice.speak(reply)
+
+        # Вызываем обработчик в режиме LLM-fallback, чтобы _minimize/_activate/
+        # _close_window/_open_app не уходили в рекурсивный _llm_fallback().
+        self._in_llm_fallback = True
         try:
             handler(args)
-            if reply and func_name != "speak":
-                self.voice.speak(reply)
         except Exception as e:
             print(f"[CommandProcessor] Ошибка LLM-функции: {e}")
             self.voice.speak("Не удалось выполнить.")
+        finally:
+            self._in_llm_fallback = False
 
     # === Обработчики жёстких команд ===
 
