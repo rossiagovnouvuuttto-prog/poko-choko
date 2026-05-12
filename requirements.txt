@@ -1,0 +1,28 @@
+# === Базовые (нужны для Python 3.12) ===
+setuptools>=70.0.0          # возвращает distutils, без которого падает SpeechRecognition
+
+# === Голос ===
+SpeechRecognition==3.10.1
+pyaudio==0.2.14
+pyttsx3==2.90               # локальный TTS на базе Windows SAPI5
+
+# === Системное управление ===
+pywin32==306
+psutil==5.9.8
+pygetwindow==0.0.9
+pyautogui==0.9.54
+
+# === GUI ===
+customtkinter==5.2.2
+pillow==10.2.0
+
+# === LLM-мозг (Mistral AI через прямой HTTP) ===
+httpx>=0.28.1
+python-dotenv==1.0.1
+
+# === Опционально: Edge-TTS (если нужно лучшее качество и нет проблем с 403) ===
+# edge-tts>=7.0.0
+# pygame==2.5.2
+
+# === Опционально: локальный Whisper вместо Google API ===
+# openai-whisper==20231117
